@@ -1,0 +1,20 @@
+# Build and start (version comes from the latest git tag, e.g. v0.1.0 or v0.1.0-3-gabc1234):
+#   YT2POD_VERSION=$(git describe --tags --always --dirty) docker compose up -d --build
+# Roll back: check out the old tag and run the same command, or start an existing image:
+#   YT2POD_VERSION=v0.1.0 docker compose up -d
+services:
+  yt2pod:
+    build:
+      context: .
+      args:
+        VERSION: ${YT2POD_VERSION:-dev}
+    image: yt2pod:${YT2POD_VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      CHECK_INTERVAL_MINUTES: ${CHECK_INTERVAL_MINUTES:-60}

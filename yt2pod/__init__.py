@@ -21,6 +21,7 @@ DEFAULTS = {
     "date_after": None, "max_items": None, "enabled": 1,
 }
 PUBLIC_ENDPOINTS = {"feed", "media", "static"}
+VERSION = os.environ.get("YT2POD_VERSION", "dev")
 
 
 def create_app():
@@ -39,6 +40,7 @@ def create_app():
         PUBLIC_BASE_URL=os.environ.get("PUBLIC_BASE_URL", "").rstrip("/"),
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", ""),
     )
+    logging.getLogger(__name__).info("yt2pod %s, data in %s", VERSION, data_dir)
     db.init(data_dir / "yt2pod.db")
     worker = Worker(downloads_dir, data_dir / "cookies.txt", int(os.environ.get("CHECK_INTERVAL_MINUTES", "60")))
     app.extensions["yt2pod_worker"] = worker
@@ -49,7 +51,7 @@ def create_app():
     @app.context_processor
     def inject():
         return {"base_url": base_url, "worker": worker, "fmt_date": _fmt_date,
-                "fmt_duration": format_duration}
+                "fmt_duration": format_duration, "version": VERSION}
 
     @app.before_request
     def require_auth():

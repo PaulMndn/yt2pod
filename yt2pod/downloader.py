@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from yt_dlp import YoutubeDL
-from yt_dlp.postprocessor import PostProcessor
+from yt_dlp.postprocessor.common import PostProcessor
 from yt_dlp.utils import DateRange
 
 from . import db
@@ -88,7 +88,7 @@ def build_options(sub, downloads_dir, cookies_file=None):
         # "oldest = 1" numbering) still reflects the whole list and numbers stay stable.
         limit = int(sub["max_items"])
 
-        def match_filter(info, *, incomplete=False):
+        def match_filter(info, **_):  # yt-dlp also passes incomplete=…, not needed here
             index = info.get("playlist_index")
             if index is not None and index > limit:
                 return f"beyond the first {limit} entries"
@@ -116,7 +116,7 @@ class _EpisodeArchive:
         # yt-dlp may ask with None for entries it can't build an id for yet
         return bool(archive_id) and db.has_episode(self.sub_id, archive_id.rpartition(" ")[2])
 
-    def add(self, archive_id):
+    def add(self, _):
         pass
 
 
@@ -180,7 +180,9 @@ def run_subscription(sub_id, downloads_dir, cookies_file=None):
     opts = build_options(sub, downloads_dir, cookies_file)
     recorder = _RecordEpisode(sub_id, downloads_dir)
     try:
-        with YoutubeDL(opts) as ydl:
+        # The typeshed stubs declare daterange/download_archive as str, but yt-dlp expects a
+        # DateRange and accepts any container for the archive, so the stub check is wrong here.
+        with YoutubeDL(opts) as ydl:  # pyright: ignore[reportArgumentType]
             ydl.add_post_processor(recorder, when="after_move")
             ydl.download([sub["url"]])
     except Exception as exc:  # noqa: BLE001 - report anything to the UI

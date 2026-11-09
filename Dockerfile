@@ -13,6 +13,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY yt2pod ./yt2pod
 
+# Set by `docker compose build` from YT2POD_VERSION (e.g. `git describe --tags`)
+ARG VERSION=dev
+LABEL org.opencontainers.image.version=$VERSION
+ENV YT2POD_VERSION=$VERSION
+
 ENV DATA_DIR=/data \
     PORT=8000 \
     CHECK_INTERVAL_MINUTES=60 \
