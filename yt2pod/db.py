@@ -122,6 +122,12 @@ def delete_subscription(sub_id):
         conn.execute("DELETE FROM subscriptions WHERE id = ?", (sub_id,))
 
 
+def folder_in_use(folder, exclude_id=None):
+    return connect().execute(
+        "SELECT 1 FROM subscriptions WHERE folder = ? AND id IS NOT ?", (folder, exclude_id)
+    ).fetchone() is not None
+
+
 def enabled_subscription_ids():
     return [r["id"] for r in connect().execute("SELECT id FROM subscriptions WHERE enabled = 1")]
 
@@ -133,6 +139,12 @@ def list_episodes(sub_id):
         "SELECT * FROM episodes WHERE subscription_id = ? ORDER BY upload_date DESC, id DESC",
         (sub_id,),
     ).fetchall()
+
+
+def has_episode(sub_id, video_id):
+    return connect().execute(
+        "SELECT 1 FROM episodes WHERE subscription_id = ? AND video_id = ?", (sub_id, video_id)
+    ).fetchone() is not None
 
 
 def add_episode(sub_id, ep):

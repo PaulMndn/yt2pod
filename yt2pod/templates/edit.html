@@ -4,11 +4,6 @@
 {% block content %}
 <h1>{{ 'Edit “' ~ sub.name ~ '”' if sub else 'Add a playlist or channel' }}</h1>
 
-{% set date_value = form.date_after %}
-{% if date_value and date_value|length == 8 and date_value.isdigit() %}
-  {% set date_value = date_value[:4] ~ '-' ~ date_value[4:6] ~ '-' ~ date_value[6:] %}
-{% endif %}
-
 <form method="post" class="settings" id="settings">
   <fieldset>
     <legend>Source</legend>
@@ -74,7 +69,7 @@
     <legend>Limits <small>(optional — useful for big channels)</small></legend>
     <div class="grid2">
       <label>Only videos uploaded on or after
-        <input type="date" name="date_after" value="{{ date_value or '' }}">
+        <input type="date" name="date_after" value="{{ form.date_after or '' }}">
         {{ err('date_after') }}
       </label>
       <label>Only the first N entries of the list

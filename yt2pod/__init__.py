@@ -3,16 +3,16 @@
 import hmac
 import logging
 import os
-import re
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from flask import (Flask, Response, abort, flash, redirect, render_template, request,
                    send_from_directory, url_for)
 
 from . import db
 from .downloader import (AUDIO_QUALITIES, NUMBERING, VIDEO_HEIGHTS, clean_folder)
-from .feeds import build_feed
+from .feeds import build_feed, format_duration
 from .worker import Worker
 
 DEFAULTS = {
@@ -29,8 +29,7 @@ def create_app():
 
     data_dir = Path(os.environ.get("DATA_DIR", "data")).resolve()
     downloads_dir = data_dir / "downloads"
-    archives_dir = data_dir / "archives"
-    for d in (data_dir, downloads_dir, archives_dir):
+    for d in (data_dir, downloads_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     app = Flask(__name__)
@@ -41,7 +40,7 @@ def create_app():
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", ""),
     )
     db.init(data_dir / "yt2pod.db")
-    worker = Worker(downloads_dir, archives_dir, int(os.environ.get("CHECK_INTERVAL_MINUTES", "60")))
+    worker = Worker(downloads_dir, data_dir / "cookies.txt", int(os.environ.get("CHECK_INTERVAL_MINUTES", "60")))
     app.extensions["yt2pod_worker"] = worker
 
     def base_url():
@@ -50,7 +49,7 @@ def create_app():
     @app.context_processor
     def inject():
         return {"base_url": base_url, "worker": worker, "fmt_date": _fmt_date,
-                "fmt_duration": _fmt_duration}
+                "fmt_duration": format_duration}
 
     @app.before_request
     def require_auth():
@@ -85,7 +84,7 @@ def create_app():
         sub = db.get_subscription(sub_id) or abort(404)
         form, errors = dict(sub), {}
         if request.method == "POST":
-            form, errors = _parse_form(request.form)
+            form, errors = _parse_form(request.form, sub_id)
             if not errors:
                 db.update_subscription(sub_id, form)
                 flash(f"Saved “{form['name']}”. Changes apply to new downloads.")
@@ -134,7 +133,6 @@ def create_app():
             folder = downloads_dir / sub["folder"]
             if folder.is_dir() and not any(folder.iterdir()):
                 folder.rmdir()
-        (archives_dir / f"{sub_id}.txt").unlink(missing_ok=True)
         db.delete_subscription(sub_id)
         flash(f"Deleted “{sub['name']}”" + (f" and {removed} file(s)." if removed else "."))
         return redirect(url_for("index"))
@@ -158,49 +156,60 @@ def _choices():
     return {"numbering": NUMBERING, "audio_qualities": AUDIO_QUALITIES, "video_heights": VIDEO_HEIGHTS}
 
 
-def _parse_form(f):
+CHOICES = {
+    "mode": ("audio", "video"),
+    "audio_quality": tuple(str(q) for q in AUDIO_QUALITIES),
+    "video_max_height": VIDEO_HEIGHTS,
+    "numbering": tuple(NUMBERING),
+}
+TEXT_FIELDS = ("name", "name_prefix", "separator", "folder")
+MAX_TEXT = 100
+
+
+def _parse_form(f, sub_id=None):
+    """Validate the subscription form. Values stay in a form-ready shape (dates as YYYY-MM-DD)."""
     errors = {}
-    data = {
-        "name": f.get("name", "").strip(),
-        "url": f.get("url", "").strip(),
-        "mode": f.get("mode", "audio"),
-        "audio_quality": f.get("audio_quality", "192"),
-        "video_max_height": f.get("video_max_height", "1080"),
-        "numbering": f.get("numbering", "oldest_first"),
-        "name_prefix": f.get("name_prefix", ""),
-        "separator": f.get("separator", ""),
-        "folder": f.get("folder", "").strip(),
-        "date_after": f.get("date_after", "").strip() or None,
-        "max_items": f.get("max_items", "").strip() or None,
-        "enabled": 1 if f.get("enabled") else 0,
-    }
+    data = {key: f.get(key, "" if default is None else str(default)) for key, default in DEFAULTS.items()}
+    for key in ("name", "url", "folder", "date_after", "max_items"):
+        data[key] = data[key].strip()
+    data["enabled"] = 1 if f.get("enabled") else 0
+
     if not data["name"]:
         errors["name"] = "Please give it a name."
-    if not re.match(r"https?://", data["url"]):
+    for key in TEXT_FIELDS:
+        if len(data[key]) > MAX_TEXT:
+            errors[key] = f"At most {MAX_TEXT} characters."
+
+    url = urlparse(data["url"])
+    if url.scheme not in ("http", "https") or not url.netloc:
         errors["url"] = "Enter a full URL starting with https://"
-    if data["mode"] not in ("audio", "video"):
-        errors["mode"] = "Invalid mode."
-    try:
+
+    for key, allowed in CHOICES.items():
+        if data[key] not in allowed:
+            errors[key] = "Please pick one of the options."
+    if "audio_quality" not in errors:
         data["audio_quality"] = int(data["audio_quality"])
-        assert data["audio_quality"] in AUDIO_QUALITIES
-    except (ValueError, AssertionError):
-        errors["audio_quality"] = "Invalid quality."
-    if data["video_max_height"] not in VIDEO_HEIGHTS:
-        errors["video_max_height"] = "Invalid resolution."
-    if data["numbering"] not in NUMBERING:
-        errors["numbering"] = "Invalid numbering."
+
     data["folder"] = clean_folder(data["folder"] or data["name"])
+    if db.folder_in_use(data["folder"], exclude_id=sub_id):
+        errors["folder"] = "Another subscription already uses this folder."
+
     if data["date_after"]:
-        try:  # from <input type=date> (YYYY-MM-DD) to yt-dlp's YYYYMMDD
-            data["date_after"] = datetime.strptime(data["date_after"], "%Y-%m-%d").strftime("%Y%m%d")
+        try:
+            datetime.strptime(data["date_after"], "%Y-%m-%d")
         except ValueError:
             errors["date_after"] = "Invalid date."
+    else:
+        data["date_after"] = None
+
     if data["max_items"]:
-        try:
+        if data["max_items"].isdigit() and int(data["max_items"]) > 0:
             data["max_items"] = int(data["max_items"])
-            assert data["max_items"] > 0
-        except (ValueError, AssertionError):
+        else:
             errors["max_items"] = "Must be a positive number."
+    else:
+        data["max_items"] = None
+
     return data, errors
 
 
@@ -214,14 +223,6 @@ def _fmt_date(value):
         return datetime.fromisoformat(value).astimezone().strftime("%Y-%m-%d %H:%M")
     except ValueError:
         return value
-
-
-def _fmt_duration(seconds):
-    if not seconds:
-        return ""
-    h, rest = divmod(int(seconds), 3600)
-    m, s = divmod(rest, 60)
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
 def _persistent_secret(data_dir):

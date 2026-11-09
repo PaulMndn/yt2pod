@@ -24,12 +24,13 @@ def _pub_date(ep):
     return format_datetime(datetime.fromisoformat(ep["downloaded_at"]))
 
 
-def _duration(seconds):
+def format_duration(seconds):
+    """H:MM:SS, or M:SS under an hour (both valid for itunes:duration); "" if unknown."""
     if not seconds:
-        return None
+        return ""
     h, rest = divmod(int(seconds), 3600)
     m, s = divmod(rest, 60)
-    return f"{h}:{m:02d}:{s:02d}"
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
 def build_feed(sub, episodes, base_url):
@@ -59,7 +60,7 @@ def build_feed(sub, episodes, base_url):
             "length": str(ep["filesize"] or 0),
             "type": ep["mime"] or "application/octet-stream",
         })
-        if duration := _duration(ep["duration"]):
+        if duration := format_duration(ep["duration"]):
             ET.SubElement(item, _it("duration")).text = duration
         if ep["thumbnail"]:
             ET.SubElement(item, _it("image"), {"href": ep["thumbnail"]})

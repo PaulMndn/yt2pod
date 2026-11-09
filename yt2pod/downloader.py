@@ -46,12 +46,12 @@ def filename_template(sub):
     return f"{head}%(title)s.%(ext)s"
 
 
-def build_options(sub, downloads_dir, archives_dir):
+def build_options(sub, downloads_dir, cookies_file=None):
     opts = {
         "outtmpl": str(Path(downloads_dir) / sub["folder"] / filename_template(sub)),
         "noplaylist": False,
         "ignoreerrors": True,
-        "download_archive": str(Path(archives_dir) / f"{sub['id']}.txt"),
+        "download_archive": _EpisodeArchive(sub["id"]),
         "quiet": True,
         "no_warnings": False,
         "noprogress": True,
@@ -61,9 +61,8 @@ def build_options(sub, downloads_dir, archives_dir):
     }
 
     # Optional Netscape-format cookies (helps against YouTube's "confirm you're not a bot").
-    cookies = Path(archives_dir).parent / "cookies.txt"
-    if cookies.is_file():
-        opts["cookiefile"] = str(cookies)
+    if cookies_file and Path(cookies_file).is_file():
+        opts["cookiefile"] = str(cookies_file)
 
     if sub["mode"] == "audio":
         opts["format"] = "bestaudio[protocol=https]/bestaudio/best"
@@ -82,7 +81,7 @@ def build_options(sub, downloads_dir, archives_dir):
         opts["merge_output_format"] = "mp4"
 
     if sub["date_after"]:
-        opts["daterange"] = DateRange(sub["date_after"])
+        opts["daterange"] = DateRange(sub["date_after"].replace("-", ""))  # YYYY-MM-DD -> YYYYMMDD
 
     if sub["max_items"]:
         # Filter by position instead of using `playlistend`, so that n_entries (used for
@@ -98,6 +97,27 @@ def build_options(sub, downloads_dir, archives_dir):
         opts["match_filter"] = match_filter
 
     return opts
+
+
+class _EpisodeArchive:
+    """yt-dlp download archive backed by the episodes table instead of a text file.
+
+    yt-dlp only needs `in` and `add()`. Entries look like "youtube <video_id>"; we match on the
+    video id. `add()` is a no-op because _RecordEpisode stores the episode after the move.
+    """
+
+    def __init__(self, sub_id):
+        self.sub_id = sub_id
+
+    def __bool__(self):  # yt-dlp skips the lookup entirely for a falsy archive
+        return True
+
+    def __contains__(self, archive_id):
+        # yt-dlp may ask with None for entries it can't build an id for yet
+        return bool(archive_id) and db.has_episode(self.sub_id, archive_id.rpartition(" ")[2])
+
+    def add(self, archive_id):
+        pass
 
 
 class _CollectingLogger:
@@ -151,14 +171,13 @@ class _RecordEpisode(PostProcessor):
         return [], info
 
 
-def run_subscription(sub_id, downloads_dir, archives_dir):
+def run_subscription(sub_id, downloads_dir, cookies_file=None):
     """Check one subscription for new videos and download them. Returns number of new episodes."""
     sub = db.get_subscription(sub_id)
     if sub is None:
         return 0
     db.set_status(sub_id, "running")
-    Path(archives_dir).mkdir(parents=True, exist_ok=True)
-    opts = build_options(sub, downloads_dir, archives_dir)
+    opts = build_options(sub, downloads_dir, cookies_file)
     recorder = _RecordEpisode(sub_id, downloads_dir)
     try:
         with YoutubeDL(opts) as ydl:
