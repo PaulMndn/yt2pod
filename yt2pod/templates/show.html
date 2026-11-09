@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ sub.name }} · yt2pod{% endblock %}
+{% block content %}
+{% set feed_url = base_url() ~ url_for('feed', sub_id=sub.id) %}
+<div class="toolbar">
+  <h1>{{ sub.name }}</h1>
+  <form method="post" action="{{ url_for('check_subscription', sub_id=sub.id) }}"><button>Check now</button></form>
+  <a class="button secondary" href="{{ url_for('edit_subscription', sub_id=sub.id) }}">Edit</a>
+</div>
+<p class="url"><a href="{{ sub.url }}" target="_blank" rel="noopener">{{ sub.url }}</a></p>
+<div class="feed">
+  <input readonly value="{{ feed_url }}" onclick="this.select()">
+  <button type="button" data-copy="{{ feed_url }}">Copy feed URL</button>
+</div>
+
+<h2>{{ episodes|length }} episode{{ '' if episodes|length == 1 else 's' }}</h2>
+{% if not episodes %}<p class="empty">Nothing downloaded yet.</p>{% endif %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Uploaded</th><th>Title</th><th>Length</th><th>File</th></tr></thead>
+  <tbody>
+  {% for ep in episodes %}
+    <tr>
+      <td class="nowrap">{{ fmt_date(ep.upload_date) }}</td>
+      <td>{% if ep.webpage_url %}<a href="{{ ep.webpage_url }}" target="_blank" rel="noopener">{{ ep.title }}</a>{% else %}{{ ep.title }}{% endif %}</td>
+      <td class="nowrap">{{ fmt_duration(ep.duration) }}</td>
+      <td><a href="{{ url_for('media', filepath=ep.filepath) }}">{{ ep.filepath.rsplit('/', 1)[-1] }}</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

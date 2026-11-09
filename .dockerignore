@@ -1,0 +1,7 @@
+.env
+.git
+.vscode
+data
+downloads
+__pycache__
+*.pyc

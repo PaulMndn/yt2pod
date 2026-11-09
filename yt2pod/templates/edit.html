@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' ~ sub.name if sub else 'Add subscription' }} · yt2pod{% endblock %}
+{% macro err(field) %}{% if errors[field] %}<span class="field-error">{{ errors[field] }}</span>{% endif %}{% endmacro %}
+{% block content %}
+<h1>{{ 'Edit “' ~ sub.name ~ '”' if sub else 'Add a playlist or channel' }}</h1>
+
+{% set date_value = form.date_after %}
+{% if date_value and date_value|length == 8 and date_value.isdigit() %}
+  {% set date_value = date_value[:4] ~ '-' ~ date_value[4:6] ~ '-' ~ date_value[6:] %}
+{% endif %}
+
+<form method="post" class="settings" id="settings">
+  <fieldset>
+    <legend>Source</legend>
+    <label>Name
+      <input name="name" value="{{ form.name }}" required placeholder="e.g. My favourite show">
+      {{ err('name') }}
+    </label>
+    <label>Playlist or channel URL
+      <input name="url" type="url" value="{{ form.url }}" required
+             placeholder="https://www.youtube.com/@channel/videos or …/playlist?list=…">
+      <small>For a channel, use its <code>/videos</code> tab URL.</small>
+      {{ err('url') }}
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Format</legend>
+    <div class="radio-row">
+      <label class="radio"><input type="radio" name="mode" value="audio" {{ 'checked' if form.mode == 'audio' }}> Audio only (mp3)</label>
+      <label class="radio"><input type="radio" name="mode" value="video" {{ 'checked' if form.mode == 'video' }}> Video (mp4)</label>
+    </div>
+    <label data-mode="audio">Audio quality
+      <select name="audio_quality">
+        {% for q in audio_qualities %}
+          <option value="{{ q }}" {{ 'selected' if form.audio_quality|int == q }}>{{ q }} kbit/s{{ ' (recommended)' if q == 192 }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label data-mode="video">Maximum resolution
+      <select name="video_max_height">
+        {% for h in video_heights %}
+          <option value="{{ h }}" {{ 'selected' if form.video_max_height == h }}>{{ 'Best available' if h == 'best' else h ~ 'p' }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>File names</legend>
+    <label>Folder
+      <input name="folder" value="{{ form.folder }}" placeholder="defaults to the name">
+      {{ err('folder') }}
+    </label>
+    <div class="grid3">
+      <label>Prefix
+        <input name="name_prefix" value="{{ form.name_prefix }}" placeholder="e.g. Ep">
+      </label>
+      <label>Number
+        <select name="numbering">
+          {% for key, (label, _, example) in numbering.items() %}
+            <option value="{{ key }}" data-example="{{ example }}" {{ 'selected' if form.numbering == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Separator
+        <input name="separator" value="{{ form.separator }}">
+      </label>
+    </div>
+    <p class="preview">Example: <code id="preview"></code></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Limits <small>(optional — useful for big channels)</small></legend>
+    <div class="grid2">
+      <label>Only videos uploaded on or after
+        <input type="date" name="date_after" value="{{ date_value or '' }}">
+        {{ err('date_after') }}
+      </label>
+      <label>Only the first N entries of the list
+        <input type="number" min="1" name="max_items" value="{{ form.max_items or '' }}" placeholder="all">
+        <small>Channel tabs list newest first, so this means the N newest videos.</small>
+        {{ err('max_items') }}
+      </label>
+    </div>
+  </fieldset>
+
+  <label class="radio"><input type="checkbox" name="enabled" value="1" {{ 'checked' if form.enabled }}> Check automatically</label>
+
+  <div class="actions">
+    <button>{{ 'Save' if sub else 'Add and start downloading' }}</button>
+    <a class="button secondary" href="{{ url_for('index') }}">Cancel</a>
+  </div>
+</form>
+
+<script>
+  const form = document.getElementById("settings");
+  function update() {
+    const f = form.elements;
+    const mode = f.mode.value;
+    form.querySelectorAll("[data-mode]").forEach((el) => (el.hidden = el.dataset.mode !== mode));
+    const strip = (s) => s.replace(/[\/\\:*?"<>|]/g, "");
+    const folder = strip(f.folder.value.trim() || f.name.value.trim() || "untitled");
+    const example = f.numbering.selectedOptions[0].dataset.example;
+    const prefix = strip(f.name_prefix.value);
+    const head = example ? prefix + example + strip(f.separator.value) : prefix;
+    const ext = mode === "audio" ? "mp3" : "mp4";
+    document.getElementById("preview").textContent = `${folder}/${head}Video title.${ext}`;
+  }
+  form.addEventListener("input", update);
+  update();
+</script>
+{% endblock %}
