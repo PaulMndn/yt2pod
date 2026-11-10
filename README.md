@@ -57,6 +57,7 @@ All configuration is done through environment variables.
 | `CHECK_INTERVAL_MINUTES` | `60` | How often all enabled subscriptions are checked. |
 | `ADMIN_PASSWORD` | empty (no login) | If set, the web UI asks for this password (HTTP basic auth, any username). Feeds and media stay public so podcast apps can fetch them. |
 | `PORT` / `HOST` | `8000` / `0.0.0.0` | Where the web server listens. |
+| `THREADS` | `1` | Number of web server threads (minimum 1). One is enough: file downloads don't block it, and YouTube downloads run in a separate background thread. |
 | `LOG_LEVEL` | `INFO` | Python log level. `DEBUG` also shows skipped videos. |
 | `SECRET_KEY` | generated and saved in `DATA_DIR/secret_key` | Only used to sign the UI's confirmation messages. |
 | `YT2POD_VERSION` | `dev` | Version shown in the footer and startup log. Set at build time, see [Versioning](#versioning-and-releases). |
