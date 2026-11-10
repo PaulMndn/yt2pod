@@ -64,6 +64,8 @@ form { margin: 0; }
 .card.disabled { opacity: .65; }
 .card-head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .card-head h2 a { text-decoration: none; }
+.cover { width: 2.5rem; height: 2.5rem; object-fit: cover; border-radius: 8px; flex: none; background: var(--border); }
+.cover.large { width: 4rem; height: 4rem; }
 .badge { font-size: .8rem; padding: .1rem .5rem; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
 .url { margin: .25rem 0 .5rem; color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1rem; margin: .5rem 0; }

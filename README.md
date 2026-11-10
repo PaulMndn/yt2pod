@@ -100,6 +100,10 @@ Every subscription card shows its feed URL (`/feeds/<id>.xml`) with a copy butto
 to your podcast app. The feed links each episode to `/media/<folder>/<file>`. Both URLs must be
 reachable from the device running the podcast app, so set `PUBLIC_BASE_URL` accordingly.
 
+The podcast cover is the channel's profile picture or the playlist's image. It is picked up during
+each check, so a new subscription shows it after its first check. Until then, the feed uses the
+newest episode's thumbnail.
+
 ### Checking and status
 
 Subscriptions are checked every `CHECK_INTERVAL_MINUTES` and when you click **Check now** /
@@ -141,10 +145,12 @@ Back up this folder to back up everything.
 
 ### Database
 
-Two tables, created on startup if missing (see `db.py`):
+Two tables, created on startup if missing (see `db.py`). Columns added in later versions are
+listed in `ADDED_COLUMNS` and added to existing databases on startup.
 
 - `subscriptions`: URL, name and all settings from the form, plus `enabled` and the result of
-  the last check (`last_checked`, `last_status`, `last_error`).
+  the last check (`last_checked`, `last_status`, `last_error`) and the cover image URL
+  (`image_url`).
 - `episodes`: one row per downloaded video: video ID, title, description, upload date,
   duration, thumbnail, file path relative to `downloads/`, size and MIME type. Unique per
   `(subscription_id, video_id)`.
@@ -167,6 +173,9 @@ enabled so reading and writing at the same time doesn't block.
    without being fetched.
 4. New videos are downloaded and converted. Once the final file is in place, a yt-dlp
    post-processor (`_RecordEpisode`) saves the episode to the database.
+   After the whole list is processed, a second post-processor (`_RecordCoverImage`) stores the
+   cover: the channel's profile picture (`avatar_uncropped`), otherwise the largest square image,
+   otherwise the largest image.
 5. The subscription's status is updated, e.g. `ok, 2 new` or `1 new, 1 error(s)` with the
    error messages.
 
@@ -237,8 +246,9 @@ Use e.g. `CHECK_INTERVAL_MINUTES=600` while developing to avoid automatic checks
   bundled with Pylance declare `daterange` and `download_archive` as strings, but yt-dlp expects
   a `DateRange` object and accepts any container for the archive.
 - **Schema changes:** the database is created with `CREATE TABLE IF NOT EXISTS`, which does not
-  change existing tables. If you add a column, existing databases need to be migrated by hand
-  (see [Known limitations](#known-limitations)).
+  change existing tables. To add a column, add it to `SCHEMA` (for new databases) and to
+  `ADDED_COLUMNS` in `db.py` (for existing ones). Only nullable columns or columns with a
+  default work this way; anything else (renames, type changes) needs a manual migration.
 - **No tests yet.** Quick manual check: add a subscription with *first N entries* set to 1, click
   **Check now**, then check that the file appears in `data/downloads/`, a second check reports
   `ok, 0 new`, and `/feeds/<id>.xml` lists the episode.
@@ -408,8 +418,8 @@ into the production folder before the first start.
 
 ## Known limitations
 
-- **No database migrations.** New columns in a future version won't be added to existing
-  databases automatically.
+- **Only simple schema upgrades.** New columns are added automatically (`ADDED_COLUMNS`), but
+  renaming or changing columns needs a manual migration.
 - **Existing files are never renamed or re-downloaded** when you change a subscription's settings.
 - **Episodes can't be deleted individually** in the UI. Deleting a subscription can remove all of
   its files.

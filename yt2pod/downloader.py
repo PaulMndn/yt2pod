@@ -171,6 +171,39 @@ class _RecordEpisode(PostProcessor):
         return [], info
 
 
+def pick_cover_image(thumbnails):
+    """Choose a podcast cover from a playlist's or channel's thumbnails.
+
+    Channel tabs list wide banners plus the profile picture ("avatar_uncropped"); playlists
+    list square images in several sizes. Prefer the profile picture, then the largest square
+    image, then the largest image of any shape.
+    """
+    thumbnails = [t for t in thumbnails or [] if t.get("url")]
+    for t in thumbnails:
+        if t.get("id") == "avatar_uncropped":
+            return t["url"]
+
+    def area(t):
+        return (t.get("width") or 0) * (t.get("height") or 0)
+
+    square = [t for t in thumbnails if t.get("width") and t.get("width") == t.get("height")]
+    best = max(square or thumbnails, key=area, default=None)
+    return best["url"] if best else None
+
+
+class _RecordCoverImage(PostProcessor):
+    """Runs once per playlist/channel (after its entries) and stores its cover image."""
+
+    def __init__(self, sub_id):
+        super().__init__()
+        self.sub_id = sub_id
+
+    def run(self, info):
+        if url := pick_cover_image(info.get("thumbnails")):
+            db.set_image(self.sub_id, url)
+        return [], info
+
+
 def run_subscription(sub_id, downloads_dir, cookies_file=None):
     """Check one subscription for new videos and download them. Returns number of new episodes."""
     sub = db.get_subscription(sub_id)
@@ -184,6 +217,7 @@ def run_subscription(sub_id, downloads_dir, cookies_file=None):
         # DateRange and accepts any container for the archive, so the stub check is wrong here.
         with YoutubeDL(opts) as ydl:  # pyright: ignore[reportArgumentType]
             ydl.add_post_processor(recorder, when="after_move")
+            ydl.add_post_processor(_RecordCoverImage(sub_id), when="playlist")
             ydl.download([sub["url"]])
     except Exception as exc:  # noqa: BLE001 - report anything to the UI
         log.exception("Subscription %s failed", sub_id)

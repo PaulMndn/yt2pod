@@ -16,6 +16,7 @@
   {% set feed_url = base_url() ~ url_for('feed', sub_id=s.id) %}
   <article class="card {% if not s.enabled %}disabled{% endif %}">
     <div class="card-head">
+      {% if s.image_url %}<img class="cover" src="{{ s.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
       <h2><a href="{{ url_for('show_subscription', sub_id=s.id) }}">{{ s.name }}</a></h2>
       <span class="badge">{{ 'Audio · mp3 ' ~ s.audio_quality ~ 'k' if s.mode == 'audio' else 'Video · ' ~ s.video_max_height ~ ('' if s.video_max_height == 'best' else 'p') }}</span>
       {% if not s.enabled %}<span class="badge muted">paused</span>{% endif %}

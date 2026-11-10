@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     last_checked     TEXT,
     last_status      TEXT,
     last_error       TEXT,
+    image_url        TEXT,
     created_at       TEXT NOT NULL
 );
 
@@ -43,6 +44,12 @@ CREATE TABLE IF NOT EXISTS episodes (
 );
 """
 
+# Columns added after the first release. CREATE TABLE IF NOT EXISTS doesn't touch existing
+# tables, so init() adds these to older databases. Only nullable columns or ones with a default.
+ADDED_COLUMNS = {
+    "subscriptions": {"image_url": "TEXT"},
+}
+
 SUBSCRIPTION_FIELDS = (
     "name", "url", "mode", "audio_quality", "video_max_height", "numbering",
     "name_prefix", "separator", "folder", "date_after", "max_items", "enabled",
@@ -61,12 +68,19 @@ def init(path):
     _path = str(path)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        for table, columns in ADDED_COLUMNS.items():
+            existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+            for name, decl in columns.items():
+                if name not in existing:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
 
 def connect():
     """Return a per-thread connection (the worker thread and web threads each get their own)."""
     conn = getattr(_local, "conn", None)
     if conn is None:
+        if _path is None:
+            raise RuntimeError("db.init() must be called before using the database")
         conn = sqlite3.connect(_path, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -115,6 +129,11 @@ def set_status(sub_id, status, error=None):
             "UPDATE subscriptions SET last_checked = ?, last_status = ?, last_error = ? WHERE id = ?",
             (now_iso(), status, error, sub_id),
         )
+
+
+def set_image(sub_id, url):
+    with connect() as conn:
+        conn.execute("UPDATE subscriptions SET image_url = ? WHERE id = ?", (url, sub_id))
 
 
 def delete_subscription(sub_id):

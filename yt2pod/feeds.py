@@ -43,9 +43,14 @@ def build_feed(sub, episodes, base_url):
     ET.SubElement(ch, "language").text = "en"
     ET.SubElement(ch, _it("author")).text = sub["name"]
     ET.SubElement(ch, _it("explicit")).text = "false"
-    image = next((e["thumbnail"] for e in episodes if e["thumbnail"]), None)
+    # Cover: channel profile picture / playlist image, else the newest episode's thumbnail.
+    image = sub["image_url"] or next((e["thumbnail"] for e in episodes if e["thumbnail"]), None)
     if image:
         ET.SubElement(ch, _it("image"), {"href": image})
+        rss_image = ET.SubElement(ch, "image")  # plain RSS readers use this one
+        ET.SubElement(rss_image, "url").text = image
+        ET.SubElement(rss_image, "title").text = sub["name"]
+        ET.SubElement(rss_image, "link").text = sub["url"]
 
     for ep in episodes:
         item = ET.SubElement(ch, "item")
