@@ -12,13 +12,13 @@ from flask import (Flask, Response, abort, flash, redirect, render_template, req
 
 from . import db
 from .downloader import (AUDIO_QUALITIES, NUMBERING, VIDEO_HEIGHTS, clean_folder)
-from .feeds import build_feed, format_duration
+from .feeds import LANGUAGES, build_feed, format_duration
 from .worker import Worker
 
 DEFAULTS = {
     "name": "", "url": "", "mode": "audio", "audio_quality": 192, "video_max_height": "1080",
     "numbering": "oldest_first", "name_prefix": "", "separator": " - ", "folder": "",
-    "date_after": None, "max_items": None, "enabled": 1,
+    "date_after": None, "max_items": None, "enabled": 1, "language": "en",
 }
 PUBLIC_ENDPOINTS = {"feed", "media", "static"}
 VERSION = os.environ.get("YT2POD_VERSION", "dev")
@@ -155,7 +155,8 @@ def create_app():
 
 
 def _choices():
-    return {"numbering": NUMBERING, "audio_qualities": AUDIO_QUALITIES, "video_heights": VIDEO_HEIGHTS}
+    return {"numbering": NUMBERING, "audio_qualities": AUDIO_QUALITIES, "video_heights": VIDEO_HEIGHTS,
+            "languages": LANGUAGES}
 
 
 CHOICES = {
@@ -163,6 +164,7 @@ CHOICES = {
     "audio_quality": tuple(str(q) for q in AUDIO_QUALITIES),
     "video_max_height": VIDEO_HEIGHTS,
     "numbering": tuple(NUMBERING),
+    "language": tuple(LANGUAGES),
 }
 TEXT_FIELDS = ("name", "name_prefix", "separator", "folder")
 MAX_TEXT = 100

@@ -22,7 +22,10 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     last_checked     TEXT,
     last_status      TEXT,
     last_error       TEXT,
+    language         TEXT NOT NULL DEFAULT 'en',
     image_url        TEXT,
+    feed_description TEXT,
+    feed_author      TEXT,
     created_at       TEXT NOT NULL
 );
 
@@ -47,12 +50,17 @@ CREATE TABLE IF NOT EXISTS episodes (
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS doesn't touch existing
 # tables, so init() adds these to older databases. Only nullable columns or ones with a default.
 ADDED_COLUMNS = {
-    "subscriptions": {"image_url": "TEXT"},
+    "subscriptions": {
+        "image_url": "TEXT",
+        "language": "TEXT NOT NULL DEFAULT 'en'",
+        "feed_description": "TEXT",
+        "feed_author": "TEXT",
+    },
 }
 
 SUBSCRIPTION_FIELDS = (
     "name", "url", "mode", "audio_quality", "video_max_height", "numbering",
-    "name_prefix", "separator", "folder", "date_after", "max_items", "enabled",
+    "name_prefix", "separator", "folder", "date_after", "max_items", "enabled", "language",
 )
 
 _path = None
@@ -131,9 +139,16 @@ def set_status(sub_id, status, error=None):
         )
 
 
-def set_image(sub_id, url):
+def set_channel_info(sub_id, image_url=None, description=None, author=None):
+    """Store what yt-dlp reports about the channel/playlist; missing values keep the old ones."""
     with connect() as conn:
-        conn.execute("UPDATE subscriptions SET image_url = ? WHERE id = ?", (url, sub_id))
+        conn.execute(
+            """UPDATE subscriptions SET image_url = COALESCE(?, image_url),
+                   feed_description = COALESCE(?, feed_description),
+                   feed_author = COALESCE(?, feed_author)
+               WHERE id = ?""",
+            (image_url, description, author, sub_id),
+        )
 
 
 def delete_subscription(sub_id):

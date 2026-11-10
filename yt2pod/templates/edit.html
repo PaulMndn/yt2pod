@@ -80,6 +80,19 @@
     </div>
   </fieldset>
 
+  <fieldset>
+    <legend>Feed</legend>
+    <label>Language
+      <select name="language">
+        {% for code, label in languages.items() %}
+          <option value="{{ code }}" {{ 'selected' if form.language == code }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <small>Shown in podcast apps. The feed's description, author and cover are taken from YouTube.</small>
+      {{ err('language') }}
+    </label>
+  </fieldset>
+
   <label class="radio"><input type="checkbox" name="enabled" value="1" {{ 'checked' if form.enabled }}> Check automatically</label>
 
   <div class="actions">

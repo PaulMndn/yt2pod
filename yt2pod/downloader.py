@@ -191,16 +191,21 @@ def pick_cover_image(thumbnails):
     return best["url"] if best else None
 
 
-class _RecordCoverImage(PostProcessor):
-    """Runs once per playlist/channel (after its entries) and stores its cover image."""
+class _RecordChannelInfo(PostProcessor):
+    """Runs once per playlist/channel (after its entries) and stores its cover image,
+    description and author (channel name) for the feed."""
 
     def __init__(self, sub_id):
         super().__init__()
         self.sub_id = sub_id
 
     def run(self, info):
-        if url := pick_cover_image(info.get("thumbnails")):
-            db.set_image(self.sub_id, url)
+        db.set_channel_info(
+            self.sub_id,
+            image_url=pick_cover_image(info.get("thumbnails")),
+            description=(info.get("description") or "").strip() or None,
+            author=info.get("channel") or info.get("uploader") or None,
+        )
         return [], info
 
 
@@ -217,7 +222,7 @@ def run_subscription(sub_id, downloads_dir, cookies_file=None):
         # DateRange and accepts any container for the archive, so the stub check is wrong here.
         with YoutubeDL(opts) as ydl:  # pyright: ignore[reportArgumentType]
             ydl.add_post_processor(recorder, when="after_move")
-            ydl.add_post_processor(_RecordCoverImage(sub_id), when="playlist")
+            ydl.add_post_processor(_RecordChannelInfo(sub_id), when="playlist")
             ydl.download([sub["url"]])
     except Exception as exc:  # noqa: BLE001 - report anything to the UI
         log.exception("Subscription %s failed", sub_id)

@@ -90,6 +90,7 @@ Click **+ Add subscription** and fill in:
   - *Only videos uploaded on or after* a date.
   - *Only the first N entries of the list*. On a channel tab these are the N newest videos.
     Numbering still counts the whole list, so numbers stay stable as the channel grows.
+- **Feed language**: the language podcast apps show for the feed (default English).
 - **Check automatically**: if unchecked, the subscription is only checked manually.
 
 Each folder can belong to only one subscription. Changing settings later only affects new
@@ -101,9 +102,10 @@ Every subscription card shows its feed URL (`/feeds/<id>.xml`) with a copy butto
 to your podcast app. The feed links each episode to `/media/<folder>/<file>`. Both URLs must be
 reachable from the device running the podcast app, so set `PUBLIC_BASE_URL` accordingly.
 
-The podcast cover is the channel's profile picture or the playlist's image. It is picked up during
-each check, so a new subscription shows it after its first check. Until then, the feed uses the
-newest episode's thumbnail.
+The feed's cover, description and author are taken from YouTube: the channel's profile picture,
+description and name, or the playlist's image, description and owner. They are picked up during each
+check, so a new subscription shows them after its first check. Until then, the feed uses the newest
+episode's thumbnail, a generic description and the subscription name.
 
 ### Checking and status
 
@@ -150,8 +152,8 @@ Two tables, created on startup if missing (see `db.py`). Columns added in later 
 listed in `ADDED_COLUMNS` and added to existing databases on startup.
 
 - `subscriptions`: URL, name and all settings from the form, plus `enabled` and the result of
-  the last check (`last_checked`, `last_status`, `last_error`) and the cover image URL
-  (`image_url`).
+  the last check (`last_checked`, `last_status`, `last_error`), the feed language and what
+  yt-dlp reports about the channel or playlist (`image_url`, `feed_description`, `feed_author`).
 - `episodes`: one row per downloaded video: video ID, title, description, upload date,
   duration, thumbnail, file path relative to `downloads/`, size and MIME type. Unique per
   `(subscription_id, video_id)`.
@@ -174,9 +176,10 @@ enabled so reading and writing at the same time doesn't block.
    without being fetched.
 4. New videos are downloaded and converted. Once the final file is in place, a yt-dlp
    post-processor (`_RecordEpisode`) saves the episode to the database.
-   After the whole list is processed, a second post-processor (`_RecordCoverImage`) stores the
-   cover: the channel's profile picture (`avatar_uncropped`), otherwise the largest square image,
-   otherwise the largest image.
+   After the whole list is processed, a second post-processor (`_RecordChannelInfo`) stores the
+   channel's or playlist's description, author and cover. For the cover it picks the channel's
+   profile picture (`avatar_uncropped`), otherwise the largest square image, otherwise the largest
+   image.
 5. The subscription's status is updated, e.g. `ok, 2 new` or `1 new, 1 error(s)` with the
    error messages.
 

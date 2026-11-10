@@ -8,6 +8,15 @@ from xml.etree import ElementTree as ET
 ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd"
 ET.register_namespace("itunes", ITUNES)
 
+# Feed languages offered in the form (ISO 639-1 codes, as used in RSS <language>).
+LANGUAGES = {
+    "en": "English", "de": "German", "fr": "French", "es": "Spanish", "it": "Italian",
+    "nl": "Dutch", "pt": "Portuguese", "pl": "Polish", "cs": "Czech", "da": "Danish",
+    "sv": "Swedish", "no": "Norwegian", "fi": "Finnish", "tr": "Turkish", "ru": "Russian",
+    "uk": "Ukrainian", "ar": "Arabic", "hi": "Hindi", "ja": "Japanese", "ko": "Korean",
+    "zh": "Chinese",
+}
+
 
 def _it(tag):
     return f"{{{ITUNES}}}{tag}"
@@ -39,9 +48,10 @@ def build_feed(sub, episodes, base_url):
     ch = ET.SubElement(rss, "channel")
     ET.SubElement(ch, "title").text = sub["name"]
     ET.SubElement(ch, "link").text = sub["url"]
-    ET.SubElement(ch, "description").text = f"Downloaded from {sub['url']} by yt2pod"
-    ET.SubElement(ch, "language").text = "en"
-    ET.SubElement(ch, _it("author")).text = sub["name"]
+    ET.SubElement(ch, "description").text = (
+        sub["feed_description"] or f"Downloaded from {sub['url']} by yt2pod")
+    ET.SubElement(ch, "language").text = sub["language"]
+    ET.SubElement(ch, _it("author")).text = sub["feed_author"] or sub["name"]
     ET.SubElement(ch, _it("explicit")).text = "false"
     # Cover: channel profile picture / playlist image, else the newest episode's thumbnail.
     image = sub["image_url"] or next((e["thumbnail"] for e in episodes if e["thumbnail"]), None)
