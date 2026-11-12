@@ -1,3 +1,5 @@
+> This is a vibe-coded project. While I have deployed the app for myself, I have not yet fully reviewed the code.
+
 # yt2pod
 
 A small self-hosted web app that turns YouTube playlists and channels into podcast feeds.
